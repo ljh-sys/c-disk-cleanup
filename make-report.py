@@ -20,7 +20,6 @@ TEMPLATE = '''<!DOCTYPE html>
   --sidebar-w: 240px;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html { scroll-behavior: smooth; }
 body { font-family: Inter, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; -webkit-font-smoothing: antialiased; }
 
 /* Hero header */
@@ -191,51 +190,23 @@ function setLang(lang) {
   if (saved) setLang(saved);
 })();
 
-// Scroll spy + smooth nav
+// Scroll spy
 (function() {
   const links = document.querySelectorAll('.sidebar-nav .s-link');
   const sections = [...links].map(a => document.querySelector(a.getAttribute('href')));
-  const offset = 130;
-  let rafId = null;
-
-  function setActive(id) {
-    links.forEach(a => a.classList.remove('active'));
-    const activeLink = document.querySelector(`.sidebar-nav a[href="#${id}"]`);
-    if (activeLink) activeLink.classList.add('active');
-  }
-
-  function updateActive() {
+  const offset = 100;
+  function onScroll() {
     let current = sections[0];
     for (const sec of sections) {
       if (!sec) continue;
       if (sec.getBoundingClientRect().top <= offset) current = sec;
     }
-    if (current) setActive(current.id);
+    links.forEach(a => a.classList.remove('active'));
+    const activeLink = document.querySelector(`.sidebar-nav a[href="#${current.id}"]`);
+    if (activeLink) activeLink.classList.add('active');
   }
-
-  function onScroll() {
-    if (rafId) cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(() => {
-      updateActive();
-      rafId = null;
-    });
-  }
-
-  // Click handler: smooth scroll + instant active update
-  links.forEach(a => {
-    a.addEventListener('click', function(e) {
-      e.preventDefault();
-      const id = this.getAttribute('href').slice(1);
-      const target = document.getElementById(id);
-      if (!target) return;
-      setActive(id);
-      const top = target.getBoundingClientRect().top + window.scrollY - 118;
-      window.scrollTo({ top, behavior: 'smooth' });
-    });
-  });
-
   window.addEventListener('scroll', onScroll, {passive: true});
-  updateActive();
+  onScroll();
 })();
 </script>
 </body>
