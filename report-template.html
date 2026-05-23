@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C盘清理分析报告</title>
+<style>
+:root {
+  --bg: #fff; --text: #101010; --text-secondary: #666;
+  --border: #10101012; --hover-bg: #f5f7fa;
+  --safe: #22c55e; --safe-bg: #f0fdf4;
+  --confirm: #f59e0b; --confirm-bg: #fffbeb;
+  --danger: #ef4444; --danger-bg: #fef2f2;
+  --sidebar-w: 240px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: Inter, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+
+/* Hero header */
+.hero { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.88); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); }
+.hero-inner { display: flex; align-items: center; gap: 24px; padding: 14px 24px; flex-wrap: wrap; }
+.hero-brand { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+.hero-stat { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
+.hero-stat b { color: var(--text); font-weight: 500; }
+.hero-stat .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+.dot.safe { background: var(--safe); } .dot.confirm { background: var(--confirm); } .dot.danger { background: var(--danger); }
+.hero-bar-wrap { padding: 0 24px 10px; display: flex; align-items: center; gap: 12px; }
+.hero-bar { flex: 1; height: 3px; background: #1010100d; border-radius: 2px; overflow: hidden; }
+.hero-bar-fill { height: 100%; border-radius: 2px; transition: width .4s; }
+.hero-bar-lbl { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+
+/* Lang switcher */
+.lang-switch { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; flex-shrink: 0; }
+.lang-switch button { position: relative; z-index: 1; font-size: 12px; padding: 3px 10px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text-secondary); cursor: pointer; transition: all .15s; font-family: inherit; }
+.lang-switch button:hover { color: var(--text); border-color: #10101040; }
+.lang-switch button.active { background: #101010; color: #fff; border-color: #101010; pointer-events: none; }
+
+/* Legend inline */
+.hero-legend { display: flex; gap: 12px; font-size: 11px; color: var(--text-secondary); padding: 0 24px 10px; }
+.hero-legend span { display: flex; align-items: center; gap: 4px; }
+.hero-legend .dot { width: 7px; height: 7px; border-radius: 50%; }
+.d-safe { background: var(--safe); } .d-confirm { background: var(--confirm); } .d-danger { background: var(--danger); }
+
+/* Layout: sidebar + content */
+.layout { display: flex; }
+.sidebar { width: var(--sidebar-w); flex-shrink: 0; position: sticky; top: 110px; height: calc(100vh - 110px); overflow-y: auto; border-right: 1px solid var(--border); padding: 20px 0; background: var(--bg); }
+.sidebar-title { font-size: 11px; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .05em; padding: 0 20px 12px; }
+.sidebar-nav { list-style: none; }
+.sidebar-nav a { display: flex; align-items: center; gap: 8px; padding: 6px 20px; font-size: 13px; color: var(--text-secondary); text-decoration: none; transition: all .12s; border-left: 2px solid transparent; }
+.sidebar-nav a:hover { color: var(--text); background: var(--hover-bg); }
+.sidebar-nav a.active { color: var(--text); font-weight: 500; background: var(--hover-bg); border-left-color: #101010; }
+.sidebar-nav .s-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.sidebar-nav .s-size { font-size: 11px; color: var(--text-secondary); margin-left: auto; font-variant-numeric: tabular-nums; }
+.sidebar-nav .s-count { font-size: 11px; color: var(--text-secondary); }
+
+/* Main content */
+.main { flex: 1; min-width: 0; padding: 0 36px 80px; overflow-x: auto; }
+
+/* Category section */
+.cat-section { margin-top: 36px; scroll-margin-top: 120px; }
+.cat-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.cat-header h2 { font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+.cat-header .cat-meta { font-size: 12px; color: var(--text-secondary); }
+.cat-header .cat-meta b { color: var(--text); }
+
+/* Table */
+.table-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+th { background: #fafafa; font-weight: 500; font-size: 12px; color: var(--text-secondary); letter-spacing: .03em; }
+tr:last-child td { border-bottom: none; }
+tr:hover { background: var(--hover-bg); }
+
+/* Column widths - all % to keep headers aligned */
+.col-risk { width: 12%; min-width: 84px; }
+.col-path { width: 32%; }
+.col-size { width: 12%; min-width: 84px; }
+.col-desc { width: 44%; }
+
+/* Risk badge */
+.badge { display: inline-flex; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+.b-safe { background: var(--safe-bg); color: #16a34a; }
+.b-confirm { background: var(--confirm-bg); color: #d97706; }
+.b-danger { background: var(--danger-bg); color: #dc2626; }
+
+.size { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.path-mono { font-family: "SF Mono", "Cascadia Code", "Consolas", monospace; font-size: 11px; color: var(--text-secondary); word-break: break-all; }
+.path-name { font-size: 13px; }
+
+.footer { padding: 20px 0; margin-top: 48px; border-top: 1px solid var(--border); text-align: center; font-size: 12px; color: var(--text-secondary); }
+
+@media (max-width: 860px) {
+  .layout { flex-direction: column; }
+  .sidebar { position: static; width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 10px 0; }
+  .sidebar-nav { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 16px; }
+  .sidebar-nav a { border-left: none; border-radius: 5px; padding: 5px 10px; font-size: 12px; }
+  .sidebar-nav a.active { border-left: none; }
+  .main { padding: 0 16px 40px; }
+  .hero-inner { gap: 12px; }
+  .hero-brand { font-size: 14px; }
+  .hero-stat { font-size: 11px; }
+  .col-desc { width: 35%; }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="hero-brand" data-i18n="report_title">C盘清理分析报告</div>
+    <div class="hero-stat">__SCAN_TIME__</div>
+    <div class="hero-stat"><span data-i18n="total_disk">总</span> <b>__TOTAL_GB__ GB</b></div>
+    <div class="hero-stat"><span data-i18n="used">已用</span> <b>__USED_GB__ GB</b></div>
+    <div class="hero-stat" style="color:#22c55e"><span data-i18n="free">剩余</span> <b style="color:#22c55e">__FREE_GB__ GB</b></div>
+
+    <div class="hero-stat"><span class="dot safe"></span><span data-i18n="safe">安全</span> <b>__SAFE_COUNT__</b> <span data-i18n="items">项</span></div>
+    <div class="hero-stat"><span class="dot confirm"></span><span data-i18n="need_confirm">需确认</span> <b>__CONFIRM_COUNT__</b> <span data-i18n="items">项</span></div>
+    <div class="lang-switch"><button onclick="setLang('zh')" id="btn-zh" class="active">中</button><button onclick="setLang('en')" id="btn-en">EN</button></div>
+  </div>
+  <div class="hero-bar-wrap">
+    <div class="hero-bar"><div class="hero-bar-fill" style="width:__USAGE_PCT__%;background:__BAR_COLOR__"></div></div>
+    <div class="hero-bar-lbl"><span data-i18n="scanned_items">扫描</span> __TOTAL_ITEMS__ <span data-i18n="items">项</span> · <span data-i18n="safe_delete">安全可删</span> __SAFE_TOTAL__ MB</div>
+  </div>
+  <div class="hero-legend">
+    <span><span class="dot d-safe"></span><span data-i18n="safe_delete">安全可删</span></span>
+    <span><span class="dot d-confirm"></span><span data-i18n="need_confirm">需确认</span></span>
+    <span><span class="dot d-danger"></span><span data-i18n="danger_note">危险勿删</span></span>
+  </div>
+</header>
+
+<div class="layout">
+
+<aside class="sidebar">
+  <div class="sidebar-title" data-i18n="categories_title">目录</div>
+  <ul class="sidebar-nav" id="sidebar-nav">
+    __SIDEBAR_ITEMS__
+  </ul>
+</aside>
+
+<div class="main">
+
+__CATEGORY_SECTIONS__
+
+<div class="footer"><span data-i18n="footer_text">C盘清理分析报告 · 由 Claude Code 自动生成</span></div>
+
+</div>
+</div>
+<script>
+const I18N = {
+  zh: {
+    c_usage: 'C盘使用率', used_space: '已用空间', free_space: '剩余空间', scanned_items: '扫描项目',
+    safe_delete: '安全可删', need_confirm: '需确认', danger_note: '危险勿删',
+    risk: '风险', path: '路径', size: '大小', desc: '说明',
+    safe: '安全', danger: '危险',
+    items: '项', total: '共', used: '已用', free: '剩余', usage: '使用率',
+    report_title: 'C盘清理分析报告', total_disk: '总', categories_title: '目录',
+    footer_text: 'C盘清理分析报告 · 由 Claude Code 自动生成'
+  },
+  en: {
+    c_usage: 'C Drive Usage', used_space: 'Used Space', free_space: 'Free Space', scanned_items: 'Scanned Items',
+    safe_delete: 'Safe to Delete', need_confirm: 'Need Confirm', danger_note: 'Danger - Do NOT Delete',
+    risk: 'Risk', path: 'Path', size: 'Size', desc: 'Description',
+    safe: 'Safe', danger: 'Danger',
+    items: 'items', total: 'total', used: 'Used', free: 'Free', usage: 'Usage',
+    report_title: 'C Drive Cleanup Report', total_disk: 'Total', categories_title: 'Categories',
+    footer_text: 'C Drive Cleanup Report · Generated by Claude Code'
+  }
+};
+
+function setLang(lang) {
+  document.documentElement.lang = lang === 'en' ? 'en' : 'zh-CN';
+  document.querySelectorAll('#btn-zh, #btn-en').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('btn-' + lang);
+  if (btn) btn.classList.add('active');
+  localStorage.setItem('cleanup-report-lang', lang);
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (I18N[lang] && I18N[lang][key]) el.textContent = I18N[lang][key];
+  });
+}
+
+(function() {
+  const saved = localStorage.getItem('cleanup-report-lang');
+  if (saved) setLang(saved);
+})();
+
+// Scroll spy + smooth nav
+(function() {
+  const links = document.querySelectorAll('.sidebar-nav .s-link');
+  const sections = [...links].map(a => document.querySelector(a.getAttribute('href')));
+  const offset = 130;
+  let rafId = null;
+
+  function setActive(id) {
+    links.forEach(a => a.classList.remove('active'));
+    const activeLink = document.querySelector(`.sidebar-nav a[href="#${id}"]`);
+    if (activeLink) activeLink.classList.add('active');
+  }
+
+  function updateActive() {
+    let current = sections[0];
+    for (const sec of sections) {
+      if (!sec) continue;
+      if (sec.getBoundingClientRect().top <= offset) current = sec;
+    }
+    if (current) setActive(current.id);
+  }
+
+  function onScroll() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      updateActive();
+      rafId = null;
+    });
+  }
+
+  // Click handler: smooth scroll + instant active update
+  links.forEach(a => {
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      const id = this.getAttribute('href').slice(1);
+      const target = document.getElementById(id);
+      if (!target) return;
+      setActive(id);
+      const top = target.getBoundingClientRect().top + window.scrollY - 118;
+      window.scrollTo({ top, behavior: 'smooth' });
+    });
+  });
+
+  window.addEventListener('scroll', onScroll, {passive: true});
+  updateActive();
+})();
+</script>
+</body>
+</html>
