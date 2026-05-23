@@ -54,7 +54,7 @@ body { font-family: Inter, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif
 .sidebar-nav .s-count { font-size: 11px; color: var(--text-secondary); }
 
 /* Main content */
-.main { flex: 1; min-width: 0; padding: 0 36px 80px; overflow-x: auto; }
+.main { flex: 1; min-width: 0; padding: 0 36px 50vh; overflow-x: auto; }
 
 /* Category section */
 .cat-section { margin-top: 36px; scroll-margin-top: 120px; }
@@ -188,7 +188,7 @@ function setLang(lang) {
 (function() {
   const links = document.querySelectorAll('.sidebar-nav .s-link');
   const sections = [...links].map(a => document.querySelector(a.getAttribute('href')));
-  const offset = 100;
+  const offset = 130;
   function onScroll() {
     let current = sections[0];
     for (const sec of sections) {
